@@ -7,6 +7,6 @@
 
 
 ## How to Use
-Clone the repo and explore the `notebooks/` folder to follow along with the learning journey.
+Clone the repo and explore the `labs/` folder to follow along with the learning journey.
 
 ## License
