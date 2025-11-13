@@ -1,0 +1,7 @@
+yahoo_fin
+streamlit
+numpy
+pandas
+matplotlib
+yfinance
+plotly
