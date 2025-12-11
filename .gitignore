@@ -1,0 +1,121 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ===== Virtual Environments =====
+venv/
+ENV/
+env/
+.venv
+
+# ===== IDE & Editors =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+.atom/
+
+# ===== Jupyter Notebook =====
+.ipynb_checkpoints
+*.ipynb_checkpoints
+.jupyter/
+
+# ===== Temporary & OS Files =====
+*.tmp
+*.log
+.cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ===== macOS =====
+.DS_Store
+.AppleDouble
+.LSOverride
+*.swp
+*.swo
+
+# ===== Windows =====
+Thumbs.db
+Desktop.ini
+*.lnk
+
+# ===== Environment Variables =====
+.env
+.env.local
+.env.*.local
+secrets/
+
+# ===== Data (except tracked files) =====
+# Keep original CSV files from World Bank
+final-project/data/gdp.csv
+final-project/data/cpi.csv
+final-project/data/PCE.csv
+final-project/data/pop.csv
+
+# But ignore temporary/cache data files
+*.csv.bak
+*.csv.tmp
+data_backup/
+
+# ===== Keep processed data & reports =====
+# Processed CSVs - TRACKED
+# !final-project/data/east_asia_pacific/
+
+# Reports/Visualizations - TRACKED
+# !final-project/reports/
+
+# ===== Project-specific =====
+.pytest_cache/
+test_results/
+*.pkl
+*.pickle
+*.joblib
+
+# ===== Documentation =====
+# Keep README and documentation
+# !README.md
+# !final-project/README.md
+
+# ===== Notebooks Output Cache =====
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ===== Large Files =====
+*.zip
+*.tar.gz
+*.rar
+
+# ===== Model Files =====
+*.h5
+*.pb
+*.pth
+models/
