@@ -27,6 +27,41 @@ INDICATORS = {
     },
 }
 
+SOURCES = {
+    "gdp": {
+        "name": "Gross Domestic Product (GDP)",
+        "source": "World Bank",
+        "unit": "USD (current, normalized 0–1)",
+        "description": "GDP đo lường tổng giá trị hàng hoá và dịch vụ được sản xuất trong một quốc gia.",
+        "years": "2000–2025",
+        "coverage": "25 quốc gia EAP chính (AUS, CHN, FJI, IDN, JPN, KOR, THA, VNM, MYS, PHL, SG, v.v.)",
+    },
+    "cpi": {
+        "name": "Consumer Price Index (CPI)",
+        "source": "World Bank / IMF",
+        "unit": "Index (2010=100, normalized 0–1)",
+        "description": "CPI theo dõi sự thay đổi giá các hàng hoá và dịch vụ tiêu dùng; dùng để đo lạm phát.",
+        "years": "2000–2024",
+        "coverage": "25 quốc gia EAP",
+    },
+    "pce": {
+        "name": "Personal Consumption Expenditure (PCE)",
+        "source": "World Bank",
+        "unit": "USD (current, normalized 0–1)",
+        "description": "PCE đo lường tổng chi tiêu tiêu dùng; phản ánh sức mua và nhu cầu hàng hoá.",
+        "years": "2000–2024",
+        "coverage": "25 quốc gia EAP",
+    },
+    "pop": {
+        "name": "Population (Total)",
+        "source": "World Bank",
+        "unit": "Người (normalized 0–1)",
+        "description": "Dân số tổng cộng của quốc gia tại đầu năm.",
+        "years": "2000–2025",
+        "coverage": "25 quốc gia EAP",
+    },
+}
+
 TRANSFORMS = {
     "raw": "Raw (normalized)",
     "per_capita": "Per-capita (gdp/pop, pce/pop)",
@@ -445,6 +480,46 @@ def missingness_section(base_df: pd.DataFrame):
     st.plotly_chart(fig, use_container_width=True)
 
 
+def sources_section():
+    st.subheader("Nguồn dữ liệu")
+    
+    st.markdown("""
+    Dashboard này sử dụng dữ liệu **chuẩn hoá (normalized)** từ 4 chỉ số chính của khu vực Đông Á & Thái Bình Dương (EAP):
+    """)
+    
+    for ind_key in ["gdp", "cpi", "pce", "pop"]:
+        if ind_key not in SOURCES:
+            continue
+        src = SOURCES[ind_key]
+        with st.expander(f"📊 {src['name']}"):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write(f"**Nguồn:** {src['source']}")
+                st.write(f"**Đơn vị:** {src['unit']}")
+            with col2:
+                st.write(f"**Khoảng thời gian:** {src['years']}")
+                st.write(f"**Phạm vi:** {src['coverage']}")
+            st.write(f"**Mô tả:** {src['description']}")
+    
+    st.divider()
+    st.markdown("""
+    ### Ghi chú xử lý dữ liệu
+    - **Chuẩn hoá (0–1):** Tất cả chỉ số đã được chuẩn hoá về [0, 1] để so sánh công bằng giữa các quốc gia.
+    - **Per-capita:** GDP/Pop, PCE/Pop để so sánh trên cơ sở mỗi người.
+    - **YoY %:** Tỷ lệ thay đổi năm-trên-năm = (Giá trị năm t / Giá trị năm t-1 - 1) × 100.
+    - **CAGR %:** Tỷ lệ tăng trưởng kép hằng năm từ đầu kỳ.
+    
+    ### Cấu trúc tệp dữ liệu
+    - Các file CSV gốc (raw): `data/gdp.csv`, `data/cpi.csv`, `data/pce.csv`, `data/pop.csv`
+    - Các file đã xử lý (processed): `data/east_asia_pacific/*_eap_processed.csv`
+    - Bộ lọc: chỉ 25 quốc gia EAP được giữ lại để trọng tâm.
+    
+    ### Cảnh báo
+    - Một số quốc gia/năm có thể thiếu dữ liệu (NaN); kiểm tra tab "Availability" để xác nhận.
+    - Dữ liệu là snapshot tại thời điểm tạo dashboard; có thể cần cập nhật định kỳ từ nguồn.
+    """)
+
+
 def download_section(df: pd.DataFrame):
     st.subheader("Download subset")
     if df.empty:
@@ -475,7 +550,7 @@ def main():
     ].copy()
     transformed.dropna(subset=["value"], inplace=True)
 
-    tab_overview, tab_ts, tab_comp, tab_dist, tab_rank, tab_facets, tab_scatter, tab_change, tab_radar, tab_spark, tab_corr, tab_missing, tab_dl = st.tabs(
+    tab_overview, tab_ts, tab_comp, tab_dist, tab_rank, tab_facets, tab_scatter, tab_change, tab_radar, tab_spark, tab_corr, tab_missing, tab_sources, tab_dl = st.tabs(
         [
             "Overview",
             "Time Series",
@@ -489,6 +564,7 @@ def main():
             "Sparklines",
             "Correlation",
             "Availability",
+            "Data Sources",
             "Download",
         ]
     )
@@ -517,6 +593,8 @@ def main():
         correlation_section(transformed)
     with tab_missing:
         missingness_section(base_filtered)
+    with tab_sources:
+        sources_section()
     with tab_dl:
         download_section(transformed)
 
