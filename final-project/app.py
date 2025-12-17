@@ -1,348 +1,463 @@
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 from pathlib import Path
+from functools import lru_cache
+import warnings
 
-# Paths
+warnings.filterwarnings('ignore')
+
+# ============================================================================
+# CONFIG & PATHS
+# ============================================================================
+st.set_page_config(page_title="EAP Economic Dashboard", layout="wide", initial_sidebar_state="expanded")
+
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data" / "east_asia_pacific"
 
+# Data sources mapping - tên file và cột dữ liệu tương ứng
 INDICATORS = {
     "gdp": {
-        "label": "GDP (normalized)",
-        "path": DATA_DIR / "gdp_eap_processed.csv",
+        "label": "GDP",
+        "file": "gdp_eap_2000_2024.csv",
+        "column": "gdp",
+        "unit": "USD (current)",
+        "source": "World Bank",
     },
     "cpi": {
-        "label": "CPI (normalized)",
-        "path": DATA_DIR / "cpi_eap_processed.csv",
+        "label": "CPI",
+        "file": "cpi_eap_2000_2024.csv",
+        "column": "cpi",
+        "unit": "Index (2010=100)",
+        "source": "World Bank/IMF",
     },
     "pce": {
-        "label": "PCE (normalized)",
-        "path": DATA_DIR / "pce_eap_processed.csv",
+        "label": "PCE",
+        "file": "pce_eap_2000_2024.csv",
+        "column": "pce",
+        "unit": "USD (current)",
+        "source": "World Bank",
     },
     "pop": {
-        "label": "Population (normalized)",
-        "path": DATA_DIR / "population_eap_processed.csv",
-    },
-}
-
-SOURCES = {
-    "gdp": {
-        "name": "Gross Domestic Product (GDP)",
+        "label": "Population",
+        "file": "pop_eap_2000_2024.csv",
+        "column": "population",
+        "unit": "Persons",
         "source": "World Bank",
-        "unit": "USD (current, normalized 0–1)",
-        "description": "GDP đo lường tổng giá trị hàng hoá và dịch vụ được sản xuất trong một quốc gia.",
-        "years": "2000–2025",
-        "coverage": "25 quốc gia EAP chính (AUS, CHN, FJI, IDN, JPN, KOR, THA, VNM, MYS, PHL, SG, v.v.)",
     },
-    "cpi": {
-        "name": "Consumer Price Index (CPI)",
-        "source": "World Bank / IMF",
-        "unit": "Index (2010=100, normalized 0–1)",
-        "description": "CPI theo dõi sự thay đổi giá các hàng hoá và dịch vụ tiêu dùng; dùng để đo lạm phát.",
-        "years": "2000–2024",
-        "coverage": "25 quốc gia EAP",
-    },
-    "pce": {
-        "name": "Personal Consumption Expenditure (PCE)",
+    "gini": {
+        "label": "GINI Index",
+        "file": "gini_index_eap_2000_2024.csv",
+        "column": "gini_index",
+        "unit": "Index (0-100)",
         "source": "World Bank",
-        "unit": "USD (current, normalized 0–1)",
-        "description": "PCE đo lường tổng chi tiêu tiêu dùng; phản ánh sức mua và nhu cầu hàng hoá.",
-        "years": "2000–2024",
-        "coverage": "25 quốc gia EAP",
     },
-    "pop": {
-        "name": "Population (Total)",
+    "poverty": {
+        "label": "Poverty Headcount",
+        "file": "poverty_headcount_eap_2000_2024.csv",
+        "column": "poverty_365",
+        "unit": "% of population",
         "source": "World Bank",
-        "unit": "Người (normalized 0–1)",
-        "description": "Dân số tổng cộng của quốc gia tại đầu năm.",
-        "years": "2000–2025",
-        "coverage": "25 quốc gia EAP",
     },
 }
 
 TRANSFORMS = {
-    "raw": "Raw (normalized)",
-    "per_capita": "Per-capita (gdp/pop, pce/pop)",
-    "yoy": "YoY % change",
-    "cagr": "CAGR % from range start",
+    "raw": "Raw Values",
+    "per_capita": "Per Capita",
+    "yoy": "YoY % Change",
+    "cagr": "CAGR %",
 }
 
+# Default countries to select
+DEFAULT_COUNTRIES = ["VNM", "THA", "IDN", "MYS", "PHL"]
 
-@st.cache_data(show_spinner=False)
-def load_indicator(key: str) -> pd.DataFrame:
-    meta = INDICATORS[key]
-    df = pd.read_csv(meta["path"])
-    df = df[df["data_level"] == "national"].copy()
-    df = df.melt(
-        id_vars=["country_code", "data_level"],
-        var_name="year",
-        value_name="value",
-    )
-    df["year"] = df["year"].astype(int)
-    df.dropna(subset=["value"], inplace=True)
-    df["indicator"] = key
-    return df
+# ============================================================================
+# DATA LOADING & CACHING
+# ============================================================================
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_indicator(key: str) -> pd.DataFrame | None:
+    """Load single indicator with error handling."""
+    try:
+        if key not in INDICATORS:
+            return None
+        
+        meta = INDICATORS[key]
+        file_path = DATA_DIR / meta["file"]
+        
+        if not file_path.exists():
+            return None
+        
+        df = pd.read_csv(file_path)
+        
+        # Ensure country_code exists
+        if "country_code" not in df.columns:
+            return None
+        
+        # Handle wide format (GINI: country_code + year columns)
+        if "year" not in df.columns:
+            # Identify year columns (numeric strings like '2000', '2001', etc)
+            year_cols = [c for c in df.columns if isinstance(c, (int, str)) and str(c).isdigit()]
+            
+            if year_cols:
+                # Wide format - melt it
+                df = df.set_index("country_code")
+                df = df[[str(c) for c in sorted(year_cols)]].copy()
+                df = df.melt(ignore_index=False, var_name="year", value_name="value")
+                df = df.reset_index()
+                df["year"] = pd.to_numeric(df["year"], errors="coerce")
+            else:
+                return None
+        else:
+            # Long format - extract value column
+            value_col = meta["column"]
+            
+            # If exact column doesn't exist, try first numeric column
+            if value_col not in df.columns:
+                numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
+                if numeric_cols:
+                    value_col = numeric_cols[0]
+                else:
+                    return None
+            
+            # Keep only needed columns
+            df = df[["country_code", "year", value_col]].copy()
+            df = df.rename(columns={value_col: "value"})
+            df["year"] = pd.to_numeric(df["year"], errors="coerce")
+        
+        # Final cleanup
+        df = df.dropna(subset=["value", "year"])
+        df["year"] = df["year"].astype(int)
+        df["indicator"] = key
+        df["unit"] = meta["unit"]
+        
+        return df[["country_code", "year", "value", "indicator", "unit"]].copy()
+    
+    except Exception as e:
+        return None
 
 
-@st.cache_data(show_spinner=False)
-def load_all() -> pd.DataFrame:
-    frames = [load_indicator(key) for key in INDICATORS]
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_all_indicators() -> pd.DataFrame:
+    """Load all indicators efficiently."""
+    frames = []
+    for key in INDICATORS.keys():
+        df = load_indicator(key)
+        if df is not None:
+            frames.append(df)
+    
+    if not frames:
+        st.error("No data loaded!")
+        return pd.DataFrame()
+    
     return pd.concat(frames, ignore_index=True)
 
 
-def filter_base(df: pd.DataFrame, countries, years) -> pd.DataFrame:
-    start_year, end_year = years
-    mask = df["country_code"].isin(countries) & df["year"].between(start_year, end_year)
-    return df.loc[mask].copy()
+# ============================================================================
+# DATA TRANSFORMATIONS
+# ============================================================================
 
-
-def _add_series_label(df: pd.DataFrame, suffix: str) -> pd.DataFrame:
+def normalize_by_country(df: pd.DataFrame, value_col: str = "value") -> pd.DataFrame:
+    """Normalize values to [0, 1] range by country."""
     df = df.copy()
-    df["series"] = df["indicator"] if suffix == "" else df["indicator"] + suffix
+    grouped = df.groupby("country_code")[value_col]
+    df[value_col] = grouped.transform(
+        lambda x: (x - x.min()) / (x.max() - x.min() + 1e-10)
+    )
     return df
 
 
-def _per_capita(df: pd.DataFrame, target_inds):
-    pop = (
-        df[df["indicator"] == "pop"][["country_code", "year", "value"]]
-        .rename(columns={"value": "pop_value"})
+def apply_per_capita(df: pd.DataFrame, inds: list) -> pd.DataFrame:
+    """Calculate per-capita values."""
+    df_pop = df[df["indicator"] == "pop"][["country_code", "year", "value"]].rename(
+        columns={"value": "pop_value"}
     )
+    
     frames = []
-    for ind in target_inds:
-        sub = df[df["indicator"] == ind].merge(pop, on=["country_code", "year"], how="left")
+    for ind in inds:
+        if ind == "pop":
+            continue
+        sub = df[df["indicator"] == ind].merge(df_pop, on=["country_code", "year"], how="left")
         sub["value"] = sub["value"] / sub["pop_value"]
         sub["series"] = f"{ind}_per_capita"
-        frames.append(sub)
-    keep = df[~df["indicator"].isin(target_inds)].copy()
+        frames.append(sub[["country_code", "year", "value", "indicator", "series"]])
+    
+    keep = df[~df["indicator"].isin(inds)].copy()
     keep["series"] = keep["indicator"]
-    return pd.concat([keep] + frames, ignore_index=True)
+    
+    return pd.concat([keep] + frames, ignore_index=True) if frames else keep
 
 
-def _yoy(df: pd.DataFrame, target_inds):
-    def pct_change(group: pd.DataFrame) -> pd.DataFrame:
-        group = group.sort_values("year").copy()
-        group["value"] = group["value"].pct_change() * 100
-        group["series"] = f"{group.iloc[0]['indicator']}_yoy%"
-        return group
+def apply_yoy(df: pd.DataFrame, inds: list) -> pd.DataFrame:
+    """Calculate year-over-year percentage change."""
+    def calc_yoy(grp):
+        grp = grp.sort_values("year").copy()
+        grp["value"] = grp["value"].pct_change() * 100
+        grp["series"] = f"{grp.iloc[0]['indicator']}_yoy"
+        return grp
+    
+    frames = [
+        df[df["indicator"] == ind].groupby("country_code", group_keys=False).apply(calc_yoy)
+        for ind in inds if ind != "pop"
+    ]
+    
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
-    parts = []
-    for ind in target_inds:
-        g = df[df["indicator"] == ind].groupby("country_code", group_keys=False).apply(pct_change)
-        parts.append(g)
-    return pd.concat(parts, ignore_index=True)
 
-
-def _cagr(df: pd.DataFrame, target_inds):
-    def calc_cagr(group: pd.DataFrame) -> pd.DataFrame:
-        group = group.sort_values("year").copy()
-        start_year = group["year"].min()
-        start_val = group.loc[group["year"] == start_year, "value"].iloc[0]
-        group["series"] = f"{group.iloc[0]['indicator']}_cagr%"
+def apply_cagr(df: pd.DataFrame, inds: list) -> pd.DataFrame:
+    """Calculate Compound Annual Growth Rate."""
+    def calc_cagr(grp):
+        grp = grp.sort_values("year").copy()
+        start_year = grp["year"].min()
+        start_val = grp.loc[grp["year"] == start_year, "value"].iloc[0]
+        grp["series"] = f"{grp.iloc[0]['indicator']}_cagr"
+        
         if start_val <= 0:
-            group["value"] = np.nan
-            return group
-        group["value"] = group.apply(
-            lambda row: ((row["value"] / start_val) ** (1 / (row["year"] - start_year)) - 1) * 100
-            if row["year"] > start_year else 0,
-            axis=1,
-        )
-        return group
+            grp["value"] = np.nan
+        else:
+            grp["value"] = grp.apply(
+                lambda row: ((row["value"] / start_val) ** (1 / max(row["year"] - start_year, 1)) - 1) * 100
+                if row["year"] > start_year else 0,
+                axis=1,
+            )
+        return grp
+    
+    frames = [
+        df[df["indicator"] == ind].groupby("country_code", group_keys=False).apply(calc_cagr)
+        for ind in inds if ind != "pop"
+    ]
+    
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
-    parts = []
-    for ind in target_inds:
-        g = df[df["indicator"] == ind].groupby("country_code", group_keys=False).apply(calc_cagr)
-        parts.append(g)
-    return pd.concat(parts, ignore_index=True)
 
-
-def apply_transform(df: pd.DataFrame, target_inds, transform: str) -> pd.DataFrame:
+def apply_transform(df: pd.DataFrame, inds: list, transform: str) -> pd.DataFrame:
+    """Apply data transformation."""
     if transform == "raw":
-        return _add_series_label(df[df["indicator"].isin(target_inds)], "")
-
-    inds = [ind for ind in target_inds if ind != "pop"]
-    if not inds:
-        return _add_series_label(df[df["indicator"].isin(target_inds)], "")
-
+        df_filtered = df[df["indicator"].isin(inds)].copy()
+        df_filtered["series"] = df_filtered["indicator"]
+        return df_filtered
+    
+    inds_no_pop = [i for i in inds if i != "pop"]
+    
     if transform == "per_capita":
-        return _per_capita(df[df["indicator"].isin(set(inds + ["pop"]))], inds)
-    if transform == "yoy":
-        return _yoy(df[df["indicator"].isin(inds)], inds)
-    if transform == "cagr":
-        return _cagr(df[df["indicator"].isin(inds)], inds)
+        return apply_per_capita(df, inds)
+    elif transform == "yoy":
+        return apply_yoy(df, inds_no_pop)
+    elif transform == "cagr":
+        return apply_cagr(df, inds_no_pop)
+    
+    # Default to raw
+    df_filtered = df[df["indicator"].isin(inds)].copy()
+    df_filtered["series"] = df_filtered["indicator"]
+    return df_filtered
 
-    return _add_series_label(df[df["indicator"].isin(target_inds)], "")
 
+# ============================================================================
+# UI & FILTERING
+# ============================================================================
 
 def build_sidebar(df: pd.DataFrame):
+    """Build sidebar filters."""
     st.sidebar.title("Filters")
+    
     countries = sorted(df["country_code"].unique())
-    default_countries = [c for c in ["VNM", "THA", "IDN", "MYS"] if c in countries]
+    default_countries = [c for c in DEFAULT_COUNTRIES if c in countries]
+    
     selected_countries = st.sidebar.multiselect(
-        "Countries (EAP)", countries, default=default_countries
+        "Countries",
+        countries,
+        default=default_countries,
+        help="Select countries to visualize"
     )
-
+    
     year_min, year_max = int(df["year"].min()), int(df["year"].max())
     selected_years = st.sidebar.slider(
-        "Year range", min_value=year_min, max_value=year_max, value=(2005, year_max)
+        "Year Range",
+        year_min, year_max,
+        (max(year_min, year_max - 10), year_max),
+        help="Select time period"
     )
-
+    
     indicator_options = list(INDICATORS.keys())
     selected_indicators = st.sidebar.multiselect(
-        "Indicators", indicator_options, default=indicator_options
+        "Indicators",
+        indicator_options,
+        default=["gdp", "pop"],
+        help="Select indicators to display"
     )
-
-    transform = st.sidebar.selectbox("Transform", list(TRANSFORMS.keys()), format_func=TRANSFORMS.get)
-
-    chart_indicator_for_facets = st.sidebar.selectbox(
-        "Indicator for sparklines", indicator_options, index=indicator_options.index("gdp") if "gdp" in indicator_options else 0
+    
+    transform = st.sidebar.selectbox(
+        "Transform",
+        list(TRANSFORMS.keys()),
+        format_func=TRANSFORMS.get,
+        help="Data transformation method"
     )
+    
+    return selected_countries, selected_years, selected_indicators, transform
 
-    return selected_countries, selected_years, selected_indicators, transform, chart_indicator_for_facets
 
-
-def filter_data(df: pd.DataFrame, countries, years, indicators) -> pd.DataFrame:
+def filter_data(df: pd.DataFrame, countries: list, years: tuple, indicators: list) -> pd.DataFrame:
+    """Filter data by countries, years, and indicators."""
     start_year, end_year = years
     mask = (
         df["country_code"].isin(countries)
         & df["indicator"].isin(indicators)
         & df["year"].between(start_year, end_year)
     )
-    return df.loc[mask].copy()
+    return df.loc[mask].copy().dropna(subset=["value"])
 
 
-def format_series_label(series: str) -> str:
-    if series in INDICATORS:
-        return INDICATORS[series]["label"]
-    return series.replace("_", " ").title()
+# ============================================================================
+# VISUALIZATION SECTIONS
+# ============================================================================
 
-
-def overview_section(df: pd.DataFrame):
+def section_overview(df: pd.DataFrame):
+    """Overview metrics."""
     st.subheader("Overview")
+    
     if df.empty:
-        st.info("Chọn ít nhất một quốc gia và một chỉ số.")
+        st.info("Select at least one country and indicator.")
         return
-
+    
     latest_year = int(df["year"].max())
-    latest = df[df["year"] == latest_year]
-    series_list = sorted(latest["series"].unique())
-    cols = st.columns(min(4, max(1, len(series_list))))
-    for idx, series in enumerate(series_list):
-        metric_df = latest[latest["series"] == series]
-        avg_val = metric_df["value"].mean()
+    latest = df[df["year"] == latest_year].groupby("indicator")["value"].mean()
+    
+    cols = st.columns(min(4, len(latest)))
+    for idx, (indicator, value) in enumerate(latest.items()):
         cols[idx % len(cols)].metric(
-            format_series_label(series), f"{avg_val:.3f}", help=f"{latest_year} average"
+            INDICATORS.get(indicator, {}).get("label", indicator),
+            f"{value:,.2f}",
+            help=f"{latest_year} average"
         )
 
 
-def timeseries_section(df: pd.DataFrame):
+def section_timeseries(df: pd.DataFrame):
+    """Time series visualization."""
     st.subheader("Time Series")
+    
     if df.empty:
-        st.info("Không có dữ liệu trong bộ lọc hiện tại.")
+        st.info("No data available for selected filters.")
         return
+    
     fig = px.line(
         df,
         x="year",
         y="value",
         color="country_code",
-        line_dash="series",
+        facet_col="indicator",
+        facet_col_wrap=2,
         markers=True,
-        hover_data={"series": True, "value":":.3f"},
+        hover_data={"value": ":.3f"},
+        labels={"value": "Value", "year": "Year", "country_code": "Country"}
     )
-    fig.update_layout(height=420, legend_title="Country / Series")
+    fig.update_layout(height=500, hovermode="x unified")
     st.plotly_chart(fig, use_container_width=True)
 
 
-def comparison_section(df: pd.DataFrame):
+def section_comparison(df: pd.DataFrame):
+    """Comparison by year."""
     st.subheader("Comparison (selected year)")
+    
     if df.empty:
-        st.info("Không có dữ liệu để so sánh.")
+        st.info("No data available.")
         return
+    
     year_choice = st.slider(
-        "Chọn năm cho biểu đồ cột", int(df["year"].min()), int(df["year"].max()), int(df["year"].max())
+        "Select year",
+        int(df["year"].min()),
+        int(df["year"].max()),
+        int(df["year"].max()),
+        key="comp_year"
     )
+    
     snap = df[df["year"] == year_choice]
     if snap.empty:
-        st.warning("Không có dữ liệu cho năm đã chọn.")
+        st.warning(f"No data for {year_choice}.")
         return
+    
     fig = px.bar(
         snap,
         x="country_code",
         y="value",
-        color="series",
+        color="indicator",
         barmode="group",
-        hover_data={"series": True, "value":":.3f"},
+        hover_data={"value": ":.3f"}
     )
-    fig.update_layout(height=420)
+    fig.update_layout(height=400)
     st.plotly_chart(fig, use_container_width=True)
 
 
-def correlation_section(df: pd.DataFrame):
-    st.subheader("Correlations")
+def section_heatmap(df: pd.DataFrame):
+    """Heatmap of countries vs indicators."""
+    st.subheader("Heatmap (latest year)")
+    
     if df.empty:
-        st.info("Không có dữ liệu để tính tương quan.")
+        st.info("No data available.")
         return
-    pivot = (
-        df.groupby(["country_code", "series"])["value"]
-        .mean()
-        .unstack("series")
-        .dropna(axis=1, how="all")
+    
+    latest_year = df["year"].max()
+    latest = df[df["year"] == latest_year]
+    
+    pivot = latest.pivot_table(
+        index="country_code",
+        columns="indicator",
+        values="value",
+        aggfunc="mean"
     )
-    if pivot.shape[1] < 2:
-        st.info("Cần ít nhất 2 chỉ số để tính tương quan.")
+    
+    if pivot.empty:
+        st.warning("Cannot create heatmap with current selection.")
         return
-    corr = pivot.corr(method="pearson")
-    fig = px.imshow(corr, text_auto=".2f", aspect="auto", color_continuous_scale="RdBu_r")
-    fig.update_layout(height=360)
+    
+    # Normalize for better heatmap visualization
+    pivot_norm = pivot.copy()
+    for col in pivot_norm.columns:
+        min_val, max_val = pivot_norm[col].min(), pivot_norm[col].max()
+        if max_val > min_val:
+            pivot_norm[col] = (pivot_norm[col] - min_val) / (max_val - min_val)
+    
+    fig = px.imshow(
+        pivot_norm,
+        labels=dict(x="Indicator", y="Country", color="Normalized Value"),
+        color_continuous_scale="YlOrRd",
+        aspect="auto"
+    )
+    fig.update_layout(height=500)
     st.plotly_chart(fig, use_container_width=True)
 
 
-def distribution_section(df: pd.DataFrame):
-    st.subheader("Distribution (box / violin)")
+def section_ranking(df: pd.DataFrame):
+    """Top-N countries ranking."""
+    st.subheader("Ranking")
+    
     if df.empty:
-        st.info("Không có dữ liệu để hiển thị phân bố.")
+        st.info("No data available.")
         return
-    year_choice = st.slider(
-        "Năm cho phân bố", int(df["year"].min()), int(df["year"].max()), int(df["year"].max()), key="dist_year"
+    
+    col1, col2, col3 = st.columns(3)
+    
+    year_choice = col1.slider(
+        "Year",
+        int(df["year"].min()),
+        int(df["year"].max()),
+        int(df["year"].max()),
+        key="rank_year"
     )
-    snap = df[df["year"] == year_choice]
+    
+    indicators = sorted(df["indicator"].unique())
+    indicator_choice = col2.selectbox("Indicator", indicators, key="rank_ind")
+    
+    top_n = col3.slider("Top N", 3, 20, 10, key="rank_n")
+    
+    snap = df[(df["year"] == year_choice) & (df["indicator"] == indicator_choice)]
     if snap.empty:
-        st.warning("Không có dữ liệu cho năm đã chọn.")
+        st.warning(f"No data for {year_choice} and {indicator_choice}.")
         return
-    chart_type = st.radio("Chọn kiểu biểu đồ", ["box", "violin"], horizontal=True, key="dist_chart")
-    if chart_type == "box":
-        fig = px.box(snap, x="series", y="value", color="series", points="outliers", hover_data={"value":":.3f"})
-    else:
-        fig = px.violin(
-            snap,
-            x="series",
-            y="value",
-            color="series",
-            box=True,
-            points="all",
-            hover_data={"value":":.3f"},
-        )
-    fig.update_layout(height=420)
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def ranking_section(df: pd.DataFrame):
-    st.subheader("Ranking / Top-N")
-    if df.empty:
-        st.info("Không có dữ liệu để xếp hạng.")
-        return
-    year_choice = st.slider(
-        "Năm cho xếp hạng", int(df["year"].min()), int(df["year"].max()), int(df["year"].max()), key="rank_year"
-    )
-    series_list = sorted(df["series"].unique())
-    series_choice = st.selectbox("Chọn series", series_list, key="rank_series")
-    top_n = st.slider("Top N", 3, 15, 5, key="rank_topn")
-    snap = df[(df["year"] == year_choice) & (df["series"] == series_choice)]
-    if snap.empty:
-        st.warning("Không có dữ liệu cho lựa chọn.")
-        return
-    snap = snap.sort_values("value", ascending=False).head(top_n)
+    
+    snap = snap.nlargest(top_n, "value")
+    
     fig = px.bar(
         snap,
         x="value",
@@ -350,253 +465,248 @@ def ranking_section(df: pd.DataFrame):
         orientation="h",
         color="value",
         color_continuous_scale="Blues",
-        hover_data={"value":":.3f"},
+        hover_data={"value": ":.3f"}
     )
-    fig.update_layout(height=420, yaxis={'categoryorder':'total ascending'})
+    fig.update_layout(height=400, yaxis={'categoryorder': 'total ascending'})
     st.plotly_chart(fig, use_container_width=True)
 
 
-def facet_lines_section(df: pd.DataFrame):
-    st.subheader("Small multiples (faceted lines)")
+def section_correlation(df: pd.DataFrame):
+    """Correlation matrix."""
+    st.subheader("Correlation Analysis")
+    
     if df.empty:
-        st.info("Không có dữ liệu để vẽ faceted line.")
+        st.info("No data available.")
         return
-    fig = px.line(
-        df,
-        x="year",
-        y="value",
-        color="country_code",
-        facet_col="series",
-        facet_col_wrap=2,
-        markers=True,
-        hover_data={"value":":.3f"},
+    
+    latest_year = df["year"].max()
+    latest = df[df["year"] == latest_year]
+    
+    pivot = latest.pivot_table(
+        index="country_code",
+        columns="indicator",
+        values="value",
+        aggfunc="mean"
+    ).dropna(axis=1, how="all")
+    
+    if pivot.shape[1] < 2:
+        st.info("Need at least 2 indicators for correlation analysis.")
+        return
+    
+    corr = pivot.corr(method="pearson")
+    
+    fig = px.imshow(
+        corr,
+        text_auto=".2f",
+        color_continuous_scale="RdBu_r",
+        zmin=-1,
+        zmax=1,
+        aspect="auto"
     )
-    fig.update_layout(height=600)
-    fig.for_each_annotation(lambda a: a.update(text=format_series_label(a.text.replace("series=", ""))))
+    fig.update_layout(height=450)
     st.plotly_chart(fig, use_container_width=True)
 
 
-def scatter_section(base_df: pd.DataFrame):
-    st.subheader("GDP vs PCE (size=Population, animation by year)")
-    needed = base_df[base_df["indicator"].isin(["gdp", "pce", "pop"])]
-    wide = needed.pivot_table(index=["country_code", "year"], columns="indicator", values="value").reset_index()
-    if wide.empty or {"gdp", "pce"}.difference(wide.columns):
-        st.info("Cần GDP và PCE để vẽ scatter.")
+def section_scatter(df: pd.DataFrame):
+    """Scatter plot with animation."""
+    st.subheader("Scatter Analysis")
+    
+    if df.empty:
+        st.info("No data available.")
         return
-    wide["pop"] = wide.get("pop", 1)
+    
+    indicators = sorted(df["indicator"].unique())
+    if len(indicators) < 2:
+        st.info("Need at least 2 indicators for scatter plot.")
+        return
+    
+    col1, col2 = st.columns(2)
+    x_ind = col1.selectbox("X-axis", indicators, index=0, key="scatter_x")
+    y_ind = col2.selectbox("Y-axis", indicators, index=min(1, len(indicators)-1), key="scatter_y")
+    
+    # Pivot data
+    x_data = df[df["indicator"] == x_ind][["country_code", "year", "value"]].rename(columns={"value": f"{x_ind}_val"})
+    y_data = df[df["indicator"] == y_ind][["country_code", "year", "value"]].rename(columns={"value": f"{y_ind}_val"})
+    
+    merged = x_data.merge(y_data, on=["country_code", "year"], how="inner")
+    
+    if merged.empty:
+        st.warning("No overlapping data for selected indicators.")
+        return
+    
     fig = px.scatter(
-        wide,
-        x="gdp",
-        y="pce",
+        merged,
+        x=f"{x_ind}_val",
+        y=f"{y_ind}_val",
         color="country_code",
-        size="pop",
         animation_frame="year",
         hover_name="country_code",
-        labels={"gdp": "GDP", "pce": "PCE"},
+        labels={
+            f"{x_ind}_val": f"{INDICATORS[x_ind]['label']}",
+            f"{y_ind}_val": f"{INDICATORS[y_ind]['label']}"
+        }
     )
-    fig.update_layout(height=520)
+    fig.update_layout(height=500)
     st.plotly_chart(fig, use_container_width=True)
 
 
-def slope_section(df: pd.DataFrame):
-    st.subheader("Diverging change between two years")
+def section_distribution(df: pd.DataFrame):
+    """Distribution visualization."""
+    st.subheader("Distribution")
+    
     if df.empty:
-        st.info("Không có dữ liệu để tính chênh lệch.")
+        st.info("No data available.")
         return
-    min_year, max_year = int(df["year"].min()), int(df["year"].max())
-    start_year, end_year = st.slider(
-        "Chọn năm bắt đầu/kết thúc", min_year, max_year, (max(min_year, max_year - 5), max_year), key="slope_years"
+    
+    col1, col2 = st.columns(2)
+    
+    year_choice = col1.slider(
+        "Year",
+        int(df["year"].min()),
+        int(df["year"].max()),
+        int(df["year"].max()),
+        key="dist_year"
     )
-    start = df[df["year"] == start_year].set_index(["country_code", "series"])["value"]
-    end = df[df["year"] == end_year].set_index(["country_code", "series"])["value"]
-    merged = pd.concat([start.rename("start"), end.rename("end")], axis=1, join="inner").dropna()
-    if merged.empty:
-        st.warning("Thiếu dữ liệu cho hai mốc năm.")
-        return
-    merged["delta"] = merged["end"] - merged["start"]
-    merged = merged.reset_index()
-    fig = px.bar(
-        merged,
-        x="country_code",
-        y="delta",
-        color="series",
-        hover_data={"start":":.3f", "end":":.3f", "delta":":.3f"},
-    )
-    fig.update_layout(height=420, title=f"Change {start_year} → {end_year}")
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def radar_section(df: pd.DataFrame):
-    st.subheader("Radar profile")
-    if df.empty:
-        st.info("Không có dữ liệu để vẽ radar.")
-        return
-    latest_year = int(df["year"].max())
-    year_choice = st.slider("Năm cho radar", int(df["year"].min()), latest_year, latest_year, key="radar_year")
-    country_choice = st.selectbox("Quốc gia", sorted(df["country_code"].unique()), key="radar_country")
-    snap = df[(df["country_code"] == country_choice) & (df["year"] == year_choice)]
+    
+    chart_type = col2.radio("Chart type", ["box", "violin"], horizontal=True, key="dist_type")
+    
+    snap = df[df["year"] == year_choice]
     if snap.empty:
-        st.warning("Không có dữ liệu cho lựa chọn.")
+        st.warning(f"No data for {year_choice}.")
         return
-    fig = px.line_polar(snap, r="value", theta="series", line_close=True, markers=True)
-    fig.update_layout(height=420)
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def sparkline_section(df: pd.DataFrame, indicator_key: str):
-    st.subheader("Country sparklines")
-    if df.empty:
-        st.info("Không có dữ liệu để vẽ sparklines.")
-        return
-    target_series = [s for s in df["series"].unique() if s.startswith(indicator_key)]
-    if not target_series:
-        st.info("Không tìm thấy series phù hợp với lựa chọn.")
-        return
-    sub = df[df["series"].isin(target_series)]
-    fig = px.line(
-        sub,
-        x="year",
-        y="value",
-        color="country_code",
-        facet_col="country_code",
-        facet_col_wrap=4,
-        hover_data={"value":":.3f"},
-    )
-    fig.update_layout(height=720, showlegend=False)
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def missingness_section(base_df: pd.DataFrame):
-    st.subheader("Data availability")
-    if base_df.empty:
-        st.info("Không có dữ liệu để kiểm tra missingness.")
-        return
-    presence = (
-        base_df.pivot_table(index="country_code", columns="year", values="value", aggfunc="size")
-        .fillna(0)
-    )
-    fig = px.imshow(presence, aspect="auto", color_continuous_scale="Greys", origin="lower")
-    fig.update_layout(height=420)
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def sources_section():
-    st.subheader("Nguồn dữ liệu")
     
-    st.markdown("""
-    Dashboard này sử dụng dữ liệu **chuẩn hoá (normalized)** từ 4 chỉ số chính của khu vực Đông Á & Thái Bình Dương (EAP):
-    """)
+    if chart_type == "box":
+        fig = px.box(snap, x="indicator", y="value", color="indicator", points="outliers")
+    else:
+        fig = px.violin(snap, x="indicator", y="value", color="indicator", box=True, points="all")
     
-    for ind_key in ["gdp", "cpi", "pce", "pop"]:
-        if ind_key not in SOURCES:
-            continue
-        src = SOURCES[ind_key]
-        with st.expander(f"📊 {src['name']}"):
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write(f"**Nguồn:** {src['source']}")
-                st.write(f"**Đơn vị:** {src['unit']}")
-            with col2:
-                st.write(f"**Khoảng thời gian:** {src['years']}")
-                st.write(f"**Phạm vi:** {src['coverage']}")
-            st.write(f"**Mô tả:** {src['description']}")
+    fig.update_layout(height=400, showlegend=False)
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def section_data_info(df_all: pd.DataFrame):
+    """Data availability and sources."""
+    st.subheader("Data Information")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**Available Indicators:**")
+        for ind_key, meta in INDICATORS.items():
+            st.caption(f"• {meta['label']}: {meta['source']}")
+    
+    with col2:
+        st.write("**Data Coverage:**")
+        countries = df_all["country_code"].nunique()
+        years_range = f"{int(df_all['year'].min())}-{int(df_all['year'].max())}"
+        st.caption(f"{countries} countries")
+        st.caption(f"Years: {years_range}")
     
     st.divider()
-    st.markdown("""
-    ### Ghi chú xử lý dữ liệu
-    - **Chuẩn hoá (0–1):** Tất cả chỉ số đã được chuẩn hoá về [0, 1] để so sánh công bằng giữa các quốc gia.
-    - **Per-capita:** GDP/Pop, PCE/Pop để so sánh trên cơ sở mỗi người.
-    - **YoY %:** Tỷ lệ thay đổi năm-trên-năm = (Giá trị năm t / Giá trị năm t-1 - 1) × 100.
-    - **CAGR %:** Tỷ lệ tăng trưởng kép hằng năm từ đầu kỳ.
     
-    ### Cấu trúc tệp dữ liệu
-    - Các file CSV gốc (raw): `data/gdp.csv`, `data/cpi.csv`, `data/pce.csv`, `data/pop.csv`
-    - Các file đã xử lý (processed): `data/east_asia_pacific/*_eap_processed.csv`
-    - Bộ lọc: chỉ 25 quốc gia EAP được giữ lại để trọng tâm.
+    # Data availability heatmap
+    st.write("**Data Availability Heatmap:**")
+    latest_year = int(df_all["year"].max())
+    availability = df_all[df_all["year"] == latest_year].pivot_table(
+        index="country_code",
+        columns="indicator",
+        values="value",
+        aggfunc="count"
+    ).fillna(0).astype(int)
     
-    ### Cảnh báo
-    - Một số quốc gia/năm có thể thiếu dữ liệu (NaN); kiểm tra tab "Availability" để xác nhận.
-    - Dữ liệu là snapshot tại thời điểm tạo dashboard; có thể cần cập nhật định kỳ từ nguồn.
-    """)
+    fig = px.imshow(
+        availability,
+        aspect="auto",
+        color_continuous_scale="Blues",
+        labels=dict(color="Available")
+    )
+    fig.update_layout(height=500)
+    st.plotly_chart(fig, use_container_width=True)
 
 
-def download_section(df: pd.DataFrame):
-    st.subheader("Download subset")
+def section_download(df: pd.DataFrame):
+    """Download filtered data."""
+    st.subheader("Download")
+    
     if df.empty:
-        st.info("Không có dữ liệu để tải xuống.")
+        st.info("No data to download.")
         return
+    
     csv_bytes = df.to_csv(index=False).encode("utf-8")
     st.download_button(
-        "Tải CSV đã lọc",
+        "Download as CSV",
         data=csv_bytes,
-        file_name="eap_filtered.csv",
+        file_name="eap_economic_data.csv",
         mime="text/csv",
     )
 
 
+# ============================================================================
+# MAIN APP
+# ============================================================================
+
 def main():
-    st.set_page_config(page_title="EAP Dashboard", layout="wide")
-    st.title("East Asia & Pacific Indicators (normalized)")
-
-    df = load_all()
-
-    selected_countries, selected_years, selected_indicators, transform, facet_indicator = build_sidebar(df)
-
-    base_filtered = filter_base(df, selected_countries, selected_years)
-    transformed = apply_transform(base_filtered, selected_indicators, transform)
-    transformed = transformed[
-        transformed["indicator"].isin(selected_indicators)
-        | transformed["series"].str.contains("per_capita|yoy%|cagr%")
-    ].copy()
-    transformed.dropna(subset=["value"], inplace=True)
-
-    tab_overview, tab_ts, tab_comp, tab_dist, tab_rank, tab_facets, tab_scatter, tab_change, tab_radar, tab_spark, tab_corr, tab_missing, tab_sources, tab_dl = st.tabs(
-        [
-            "Overview",
-            "Time Series",
-            "Comparison",
-            "Distribution",
-            "Ranking",
-            "Small multiples",
-            "Scatter",
-            "Change",
-            "Radar",
-            "Sparklines",
-            "Correlation",
-            "Availability",
-            "Data Sources",
-            "Download",
-        ]
-    )
-
-    with tab_overview:
-        overview_section(transformed)
-    with tab_ts:
-        timeseries_section(transformed)
-    with tab_comp:
-        comparison_section(transformed)
-    with tab_dist:
-        distribution_section(transformed)
-    with tab_rank:
-        ranking_section(transformed)
-    with tab_facets:
-        facet_lines_section(transformed)
-    with tab_scatter:
-        scatter_section(base_filtered)
-    with tab_change:
-        slope_section(transformed)
-    with tab_radar:
-        radar_section(transformed)
-    with tab_spark:
-        sparkline_section(transformed, facet_indicator)
-    with tab_corr:
-        correlation_section(transformed)
-    with tab_missing:
-        missingness_section(base_filtered)
-    with tab_sources:
-        sources_section()
-    with tab_dl:
-        download_section(transformed)
+    """Main application."""
+    st.title("East Asia & Pacific Economic Dashboard")
+    st.markdown("Real-time economic indicators for 25+ countries in the EAP region")
+    
+    # Load all data
+    df_all = load_all_indicators()
+    
+    if df_all.empty:
+        st.error("Failed to load data. Please check data files.")
+        return
+    
+    # Sidebar filters
+    selected_countries, selected_years, selected_indicators, transform = build_sidebar(df_all)
+    
+    if not selected_countries or not selected_indicators:
+        st.warning("Please select at least one country and one indicator.")
+        return
+    
+    # Filter and transform data
+    df_filtered = filter_data(df_all, selected_countries, selected_years, selected_indicators)
+    
+    if df_filtered.empty:
+        st.error("No data available for selected filters.")
+        return
+    
+    df_transformed = apply_transform(df_filtered, selected_indicators, transform)
+    
+    # Display tabs
+    tabs = st.tabs([
+        "Overview",
+        "Time Series",
+        "Comparison",
+        "Heatmap",
+        "Ranking",
+        "Correlation",
+        "Scatter",
+        "Distribution",
+        "Data Info",
+        "Download"
+    ])
+    
+    with tabs[0]:
+        section_overview(df_transformed)
+    with tabs[1]:
+        section_timeseries(df_transformed)
+    with tabs[2]:
+        section_comparison(df_transformed)
+    with tabs[3]:
+        section_heatmap(df_transformed)
+    with tabs[4]:
+        section_ranking(df_transformed)
+    with tabs[5]:
+        section_correlation(df_transformed)
+    with tabs[6]:
+        section_scatter(df_filtered)
+    with tabs[7]:
+        section_distribution(df_transformed)
+    with tabs[8]:
+        section_data_info(df_all)
+    with tabs[9]:
+        section_download(df_transformed)
 
 
 if __name__ == "__main__":
