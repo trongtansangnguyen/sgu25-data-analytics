@@ -1,0 +1,165 @@
+country_code,country_name,year,poverty_215,poverty_365,poverty_685
+AUS,Australia,2001,1.0,1.0,1.7
+AUS,Australia,2003,1.0,1.2,2.0
+AUS,Australia,2004,0.7,0.7,1.2
+AUS,Australia,2008,0.7,0.7,1.0
+AUS,Australia,2010,0.3,0.7,1.0
+AUS,Australia,2014,0.5,0.7,1.0
+AUS,Australia,2016,0.5,0.5,1.0
+AUS,Australia,2018,0.5,0.7,1.2
+AUS,Australia,2020,1.0,1.0,1.5
+CHN,China,2002,48.1,64.0,89.3
+CHN,China,2005,33.1,50.7,81.8
+CHN,China,2008,26.2,41.6,73.0
+CHN,China,2010,20.6,34.9,66.1
+CHN,China,2011,15.7,29.7,62.7
+CHN,China,2012,13.2,25.7,58.0
+CHN,China,2013,6.2,17.0,51.7
+CHN,China,2014,4.7,14.0,46.7
+CHN,China,2015,3.0,10.9,42.4
+CHN,China,2016,2.2,8.7,38.7
+CHN,China,2017,1.7,7.7,36.3
+CHN,China,2018,0.8,5.7,32.2
+CHN,China,2019,0.0,3.2,28.9
+CHN,China,2020,0.0,1.7,29.5
+CHN,China,2021,0.0,0.3,21.0
+CHN,China,2022,0.0,0.5,21.5
+FJI,Fiji,2002,5.4,14.9,52.4
+FJI,Fiji,2008,3.8,11.5,48.9
+FJI,Fiji,2013,1.6,7.9,46.7
+FJI,Fiji,2019,4.7,15.1,61.3
+FSM,"Micronesia, Fed. Sts.",2005,15.8,29.2,64.9
+FSM,"Micronesia, Fed. Sts.",2013,26.1,43.8,78.1
+IDN,Indonesia,2000,65.7,84.3,97.6
+IDN,Indonesia,2001,62.3,81.9,96.8
+IDN,Indonesia,2002,46.8,73.1,94.9
+IDN,Indonesia,2003,45.5,71.3,95.4
+IDN,Indonesia,2004,45.4,71.7,94.8
+IDN,Indonesia,2005,41.1,68.6,94.6
+IDN,Indonesia,2006,46.8,71.8,95.3
+IDN,Indonesia,2007,41.1,66.0,92.6
+IDN,Indonesia,2008,38.0,63.4,92.4
+IDN,Indonesia,2009,37.9,63.8,92.1
+IDN,Indonesia,2010,34.1,56.7,88.9
+IDN,Indonesia,2011,31.2,53.6,85.8
+IDN,Indonesia,2012,26.6,49.9,84.7
+IDN,Indonesia,2013,27.2,49.7,82.6
+IDN,Indonesia,2014,25.7,47.7,82.0
+IDN,Indonesia,2015,21.6,43.4,81.9
+IDN,Indonesia,2016,18.0,38.7,77.5
+IDN,Indonesia,2017,14.8,34.1,74.1
+IDN,Indonesia,2018,12.5,30.3,71.2
+IDN,Indonesia,2019,10.8,28.3,70.4
+IDN,Indonesia,2020,9.8,26.4,69.4
+IDN,Indonesia,2021,8.6,24.2,68.5
+IDN,Indonesia,2022,7.9,23.7,70.3
+IDN,Indonesia,2023,6.7,21.9,69.6
+IDN,Indonesia,2024,5.4,19.9,68.3
+JPN,Japan,2008,1.0,1.7,3.7
+JPN,Japan,2009,0.9,1.5,3.2
+JPN,Japan,2010,0.7,1.0,2.0
+JPN,Japan,2011,0.5,1.2,2.7
+JPN,Japan,2012,1.5,1.5,2.4
+JPN,Japan,2013,1.0,1.2,3.7
+JPN,Japan,2014,0.7,0.9,1.7
+JPN,Japan,2015,0.4,0.6,2.0
+JPN,Japan,2016,0.7,1.2,2.6
+JPN,Japan,2017,0.6,1.2,2.0
+JPN,Japan,2018,1.0,1.7,3.2
+JPN,Japan,2019,1.2,1.7,3.7
+JPN,Japan,2020,1.2,1.5,3.2
+KIR,Kiribati,2006,21.3,40.0,82.7
+KIR,Kiribati,2019,6.1,22.0,74.9
+KOR,"Korea, Rep.",2006,0.5,0.7,2.7
+KOR,"Korea, Rep.",2008,0.5,0.7,2.2
+KOR,"Korea, Rep.",2010,0.5,1.0,2.7
+KOR,"Korea, Rep.",2012,0.5,0.7,2.2
+KOR,"Korea, Rep.",2014,0.2,0.5,2.0
+KOR,"Korea, Rep.",2016,0.2,0.5,1.2
+KOR,"Korea, Rep.",2017,0.2,0.2,1.2
+KOR,"Korea, Rep.",2018,0.2,0.2,1.0
+KOR,"Korea, Rep.",2019,0.2,0.2,0.5
+KOR,"Korea, Rep.",2020,0.0,0.2,0.5
+KOR,"Korea, Rep.",2021,0.2,0.2,0.5
+LAO,Lao PDR,2002,43.1,68.5,93.6
+LAO,Lao PDR,2007,36.0,61.1,90.2
+LAO,Lao PDR,2012,21.7,43.2,82.5
+LAO,Lao PDR,2018,15.7,35.0,75.3
+MHL,Marshall Islands,2019,2.1,6.7,36.5
+MMR,Myanmar,2015,18.2,40.6,82.5
+MMR,Myanmar,2017,10.3,29.1,79.8
+MNG,Mongolia,2002,18.7,37.0,78.3
+MNG,Mongolia,2007,4.0,14.3,53.2
+MNG,Mongolia,2010,3.5,12.1,51.5
+MNG,Mongolia,2011,2.2,8.5,46.5
+MNG,Mongolia,2012,1.1,5.6,36.7
+MNG,Mongolia,2014,0.8,4.0,30.6
+MNG,Mongolia,2016,1.9,8.1,44.7
+MNG,Mongolia,2018,1.7,6.7,41.1
+MNG,Mongolia,2022,0.4,2.3,24.4
+MYS,Malaysia,2003,3.2,8.4,30.4
+MYS,Malaysia,2006,1.7,5.0,24.7
+MYS,Malaysia,2008,1.5,5.4,24.2
+MYS,Malaysia,2011,0.4,1.9,14.7
+MYS,Malaysia,2013,0.1,0.6,7.7
+MYS,Malaysia,2015,0.1,0.4,5.7
+MYS,Malaysia,2018,0.0,0.2,4.2
+MYS,Malaysia,2021,0.0,0.1,2.9
+NRU,Nauru,2012,9.7,21.7,68.5
+PHL,Philippines,2000,25.9,42.8,73.4
+PHL,Philippines,2003,24.3,41.0,73.0
+PHL,Philippines,2006,26.1,42.8,72.5
+PHL,Philippines,2009,22.0,38.9,71.0
+PHL,Philippines,2012,21.3,38.1,69.9
+PHL,Philippines,2015,14.6,30.7,65.8
+PHL,Philippines,2018,8.3,21.8,60.2
+PHL,Philippines,2021,8.1,21.3,62.3
+PHL,Philippines,2023,5.3,16.9,58.7
+PNG,Papua New Guinea,2009,52.2,69.4,92.1
+SLB,Solomon Islands,2005,62.2,75.9,92.6
+SLB,Solomon Islands,2012,40.3,62.9,90.7
+THA,Thailand,2000,8.4,23.1,61.2
+THA,Thailand,2002,4.7,16.1,53.3
+THA,Thailand,2004,3.1,11.9,46.7
+THA,Thailand,2006,2.2,8.4,39.5
+THA,Thailand,2007,1.3,6.5,37.4
+THA,Thailand,2008,1.0,5.2,35.2
+THA,Thailand,2009,0.8,4.4,32.2
+THA,Thailand,2010,0.7,3.8,30.0
+THA,Thailand,2011,0.3,2.0,25.5
+THA,Thailand,2012,0.4,2.3,24.9
+THA,Thailand,2013,0.2,1.7,21.8
+THA,Thailand,2014,0.2,1.4,20.9
+THA,Thailand,2015,0.1,0.8,16.9
+THA,Thailand,2016,0.1,1.0,17.9
+THA,Thailand,2017,0.1,0.8,17.2
+THA,Thailand,2018,0.1,0.9,17.8
+THA,Thailand,2019,0.1,0.6,15.2
+THA,Thailand,2020,0.1,0.6,15.1
+THA,Thailand,2021,0.0,0.5,14.1
+THA,Thailand,2022,0.0,0.2,9.9
+THA,Thailand,2023,0.0,0.1,9.9
+TLS,Timor-Leste,2001,55.7,74.3,95.1
+TLS,Timor-Leste,2007,60.1,81.9,98.5
+TLS,Timor-Leste,2014,43.9,71.3,96.0
+TON,Tonga,2000,4.6,9.7,40.5
+TON,Tonga,2009,3.6,10.8,45.4
+TON,Tonga,2015,4.0,15.1,55.3
+TON,Tonga,2021,0.4,1.8,26.7
+TUV,Tuvalu,2010,9.0,21.2,60.6
+VNM,Viet Nam,2002,43.3,65.0,89.6
+VNM,Viet Nam,2004,30.9,53.4,85.4
+VNM,Viet Nam,2006,23.7,43.9,81.8
+VNM,Viet Nam,2008,17.6,38.8,79.0
+VNM,Viet Nam,2010,5.2,13.7,49.6
+VNM,Viet Nam,2012,3.7,9.9,43.2
+VNM,Viet Nam,2014,3.4,8.6,37.9
+VNM,Viet Nam,2016,2.5,6.2,29.8
+VNM,Viet Nam,2018,2.2,5.2,24.2
+VNM,Viet Nam,2020,1.3,3.7,20.4
+VNM,Viet Nam,2022,1.6,4.2,21.5
+VUT,Vanuatu,2010,25.7,44.4,82.0
+VUT,Vanuatu,2019,19.5,36.9,81.3
+WSM,Samoa,2002,5.9,15.0,51.8
+WSM,Samoa,2008,3.7,12.3,49.6
+WSM,Samoa,2013,4.5,11.5,49.4
